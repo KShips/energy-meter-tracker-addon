@@ -1,6 +1,6 @@
 # Energy Meter Tracker
 
-A Home Assistant add-on that records your electricity usage in precise half-hour blocks — the same intervals used by your energy supplier for billing.
+A Home Assistant add-on that records your electricity usage in precise half-hour blocks — the same intervals used by UK energy supplier for billing.
 
 ## What it does
 
