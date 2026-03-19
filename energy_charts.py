@@ -1,10 +1,26 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 try:
     from zoneinfo import ZoneInfo
 except ImportError:
     from backports.zoneinfo import ZoneInfo
+import os
 from collections import defaultdict
+
 import json
+
+# ─────────────────────────────────────────────────────────────
+# Timezone helper
+# ─────────────────────────────────────────────────────────────
+
+def _utc_to_local(dt_naive: datetime, tz: "ZoneInfo") -> datetime:
+    """Attach UTC, then convert to local timezone."""
+    return dt_naive.replace(tzinfo=timezone.utc).astimezone(tz)
+
+
+def _parse_block_start(iso_str: str, tz: "ZoneInfo") -> datetime:
+    """Parse a UTC ISO block-start string and return it in local time."""
+    return _utc_to_local(datetime.fromisoformat(iso_str), tz)
+
 
 
 # ─────────────────────────────────────────────────────────────
@@ -61,12 +77,13 @@ def build_meter_colors(blocks):
 # Billing period helpers
 # ─────────────────────────────────────────────────────────────
 
-def get_all_billing_periods(blocks, billing_day):
+def get_all_billing_periods(blocks, billing_day, tz=None):
     if not blocks:
         return []
+    _tz = tz or ZoneInfo("UTC")
     sorted_blocks = sorted([b for b in blocks if b and b.get("start")], key=lambda b: b["start"])
-    first = datetime.fromisoformat(sorted_blocks[0]["start"])
-    last  = datetime.fromisoformat(sorted_blocks[-1]["start"])
+    first = _parse_block_start(sorted_blocks[0]["start"], _tz)
+    last  = _parse_block_start(sorted_blocks[-1]["start"], _tz)
 
     year, month = first.year, first.month
     if first.day < billing_day:
@@ -92,13 +109,14 @@ def get_all_billing_periods(blocks, billing_day):
     return periods
 
 
-def get_all_calmonth_periods(blocks):
+def get_all_calmonth_periods(blocks, tz=None):
     """Calendar months: Jan 1 to Feb 1, Feb 1 to Mar 1, etc."""
     if not blocks:
         return []
+    _tz = tz or ZoneInfo("UTC")
     sorted_blocks = sorted([b for b in blocks if b and b.get("start")], key=lambda b: b["start"])
-    first = datetime.fromisoformat(sorted_blocks[0]["start"])
-    last  = datetime.fromisoformat(sorted_blocks[-1]["start"])
+    first = _parse_block_start(sorted_blocks[0]["start"], _tz)
+    last  = _parse_block_start(sorted_blocks[-1]["start"], _tz)
     periods = []
     cur = first.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     while True:
@@ -113,13 +131,14 @@ def get_all_calmonth_periods(blocks):
     return periods
 
 
-def get_all_quarter_periods(blocks):
+def get_all_quarter_periods(blocks, tz=None):
     """Calendar quarters: Q1=Jan-Apr, Q2=Apr-Jul, Q3=Jul-Oct, Q4=Oct-Jan."""
     if not blocks:
         return []
+    _tz = tz or ZoneInfo("UTC")
     sorted_blocks = sorted([b for b in blocks if b and b.get("start")], key=lambda b: b["start"])
-    first = datetime.fromisoformat(sorted_blocks[0]["start"])
-    last  = datetime.fromisoformat(sorted_blocks[-1]["start"])
+    first = _parse_block_start(sorted_blocks[0]["start"], _tz)
+    last  = _parse_block_start(sorted_blocks[-1]["start"], _tz)
     def quarter_start(dt):
         qm = ((dt.month - 1) // 3) * 3 + 1
         return dt.replace(month=qm, day=1, hour=0, minute=0, second=0, microsecond=0)
@@ -137,13 +156,14 @@ def get_all_quarter_periods(blocks):
     return periods
 
 
-def get_all_year_periods(blocks):
+def get_all_year_periods(blocks, tz=None):
     """Calendar years: Jan 1 to Jan 1."""
     if not blocks:
         return []
+    _tz = tz or ZoneInfo("UTC")
     sorted_blocks = sorted([b for b in blocks if b and b.get("start")], key=lambda b: b["start"])
-    first = datetime.fromisoformat(sorted_blocks[0]["start"])
-    last  = datetime.fromisoformat(sorted_blocks[-1]["start"])
+    first = _parse_block_start(sorted_blocks[0]["start"], _tz)
+    last  = _parse_block_start(sorted_blocks[-1]["start"], _tz)
     periods = []
     cur = first.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
     while True:
@@ -683,7 +703,7 @@ def generate_daily_import_export_charts(blocks, timezone_name="UTC"):
         try:
             if not block or not block.get("start"):
                 continue
-            start = datetime.fromisoformat(block["start"])
+            start = _parse_block_start(block["start"], _tz)
             day   = start.date().isoformat()
             hh    = start.hour * 2 + (1 if start.minute >= 30 else 0)
             days_map[day].append((hh, block))
@@ -703,7 +723,7 @@ def generate_daily_import_export_charts(blocks, timezone_name="UTC"):
     except (StopIteration, KeyError, TypeError, ValueError):
         billing_day = 1
 
-    periods = get_all_billing_periods(blocks, billing_day)
+    periods = get_all_billing_periods(blocks, billing_day, tz=_tz)
 
     # ── Build per-period data ──
     period_sections = []   # list of dicts
@@ -734,7 +754,7 @@ def generate_daily_import_export_charts(blocks, timezone_name="UTC"):
 
     # ── Quarter periods ──
     quarter_sections = []
-    for i, (q_start, q_end) in enumerate(get_all_quarter_periods(blocks)):
+    for i, (q_start, q_end) in enumerate(get_all_quarter_periods(blocks, tz=_tz)):
         summary    = calculate_billing_summary_for_period(blocks, q_start, q_end)
         is_current = q_start.date() <= today < q_end.date()
         q_num      = (q_start.month - 1) // 3 + 1
@@ -754,7 +774,7 @@ def generate_daily_import_export_charts(blocks, timezone_name="UTC"):
 
     # ── Year periods ──
     year_sections = []
-    for i, (y_start, y_end) in enumerate(get_all_year_periods(blocks)):
+    for i, (y_start, y_end) in enumerate(get_all_year_periods(blocks, tz=_tz)):
         summary    = calculate_billing_summary_for_period(blocks, y_start, y_end)
         is_current = y_start.date() <= today < y_end.date()
         year_sections.append({
@@ -773,7 +793,7 @@ def generate_daily_import_export_charts(blocks, timezone_name="UTC"):
 
     # ── Calendar month periods ──
     calmonth_sections = []
-    for i, (cm_start, cm_end) in enumerate(get_all_calmonth_periods(blocks)):
+    for i, (cm_start, cm_end) in enumerate(get_all_calmonth_periods(blocks, tz=_tz)):
         summary    = calculate_billing_summary_for_period(blocks, cm_start, cm_end)
         is_current = cm_start.date() <= today < cm_end.date()
         calmonth_sections.append({
@@ -1833,10 +1853,14 @@ def generate_net_heatmap(blocks, timezone_name="UTC"):
             return 0.0
 
     # ───── Build day → 48 half-hour slots ─────
+    try:
+        _tz = ZoneInfo(timezone_name)
+    except Exception:
+        _tz = ZoneInfo("UTC")
     days = defaultdict(lambda: [0.0] * 48)
     for block in sorted([b for b in blocks if b and b.get("start")], key=lambda b: b["start"]):
         try:
-            start = datetime.fromisoformat(block["start"])
+            start = _parse_block_start(block["start"], _tz)
             day = start.date().isoformat()
             hh_index = start.hour * 2 + (1 if start.minute >= 30 else 0)
             totals = block.get("totals", {}) or {}
