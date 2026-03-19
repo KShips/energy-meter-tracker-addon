@@ -1,6 +1,6 @@
 name: "Energy Meter Tracker KShips Dev"
 description: "Half-hourly energy metering engine with sub-meter support, gap filling, and billing charts."
-version: "1.1.1"
+version: "1.1.2"
 slug: "energy_meter_tracker_dev"
 init: false
 startup: application
