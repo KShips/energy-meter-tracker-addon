@@ -21,14 +21,14 @@ map:
 # ── Network ───────────────────────────────────────────────────────────────────
 # Port 8099 — direct access (optional, can be disabled)
 ports:
-  8098/tcp: 8098
+  8099/tcp: 8099
 ports_description:
-  8098/tcp: "Web UI (direct access)"
+  8099/tcp: "Web UI (direct access)"
 
 # ── Ingress ───────────────────────────────────────────────────────────────────
 # Enables the "Show in sidebar" toggle and embedded UI in HA
 ingress: true
-ingress_port: 8098
+ingress_port: 8099
 
 # ── HA API access ─────────────────────────────────────────────────────────────
 # Required for WebSocket + REST API calls to HA
