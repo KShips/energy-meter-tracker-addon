@@ -18,7 +18,11 @@ import asyncio
 import logging
 import os
 import shutil
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+try:
+    from zoneinfo import ZoneInfo
+except ImportError:
+    from backports.zoneinfo import ZoneInfo
 
 from energy_engine_io import (
     ensure_dir,
@@ -135,6 +139,26 @@ def load_config() -> dict:
     return load_json(CONFIG_PATH, {"meters": {}})
 
 
+def get_configured_tz() -> "ZoneInfo":
+    """Return ZoneInfo from the ADDON_TIMEZONE env var (set via add-on config)."""
+    tz_name = os.environ.get("ADDON_TIMEZONE", "UTC")
+    try:
+        return ZoneInfo(tz_name)
+    except Exception:
+        logger.warning("engine: unknown timezone %r — falling back to UTC", tz_name)
+        return ZoneInfo("UTC")
+
+
+def now_utc() -> datetime:
+    """Return the current time in UTC (tz-aware)."""
+    return datetime.now(tz=timezone.utc)
+
+
+def now_local() -> datetime:
+    """Return the current time in the configured local timezone (tz-aware)."""
+    return datetime.now(tz=get_configured_tz())
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Block lifecycle helpers
 # ─────────────────────────────────────────────────────────────────────────────
@@ -222,7 +246,7 @@ def extract_last_reads(block: dict):
 
 def set_gap_marker(block: dict, pre_reads: dict, last_known_rates: dict):
     block["_gap_marker"] = {
-        "detected_at":      datetime.utcnow().isoformat(),
+        "detected_at":      now_utc().isoformat(),
         "pre_reads":        pre_reads,
         "last_known_rates": last_known_rates,
     }
@@ -621,14 +645,15 @@ def generate_charts(blocks: list):
     if not blocks:
         logger.info("generate_charts: no blocks, skipping")
         return
+    tz_name = os.environ.get("ADDON_TIMEZONE", "UTC")
     try:
-        html = energy_charts.generate_net_heatmap(blocks)
+        html = energy_charts.generate_net_heatmap(blocks, timezone_name=tz_name)
         io_save_file(f"{CHART_DIR}/net_heatmap.html", html)
         logger.info("generate_charts: net heatmap written")
     except Exception as e:
         logger.error("generate_charts: heatmap error: %s", e)
     try:
-        html = energy_charts.generate_daily_import_export_charts(blocks)
+        html = energy_charts.generate_daily_import_export_charts(blocks, timezone_name=tz_name)
         io_save_file(f"{CHART_DIR}/daily_usage.html", html)
         logger.info("generate_charts: daily usage chart written")
     except Exception as e:
@@ -931,7 +956,7 @@ async def _deferred_sensor_update(ha: HAClient, engine_totals: dict):
 async def on_import_meter_update(entity_id: str, new_val: str, full_state: dict):
     """Fired by ha_client when the main import sensor changes state."""
     try:
-        now = datetime.utcnow()
+        now = now_utc()
         _read_queue.append(now)
         logger.info("on_import_meter_update: read queued at %s", now.isoformat())
     except Exception as e:
@@ -941,7 +966,7 @@ async def on_import_meter_update(entity_id: str, new_val: str, full_state: dict)
 async def on_export_meter_update(entity_id: str, new_val: str, full_state: dict):
     """Fired by ha_client when the main export sensor changes state."""
     try:
-        now = datetime.utcnow()
+        now = now_utc()
         _read_queue.append(now)
         logger.info("on_export_meter_update: read queued at %s", now.isoformat())
     except Exception as e:
@@ -973,7 +998,7 @@ async def engine_loop_task(ha: HAClient):
 async def _engine_tick(ha: HAClient):
     if _engine_paused:
         return
-    now = datetime.utcnow()
+    now = now_utc()
 
     current_block = load_json(CURRENT_BLOCK_PATH, {})
 
@@ -1124,7 +1149,7 @@ async def engine_startup(ha: HAClient):
         last_block     = blocks[-1]
         last_block_end = last_block.get("end")
         if last_block_end:
-            missing_windows = detect_gap(last_block_end, datetime.utcnow())
+            missing_windows = detect_gap(last_block_end, now_utc())
             if missing_windows:
                 logger.warning(
                     "engine_startup: session gap detected — %d missing blocks", len(missing_windows)

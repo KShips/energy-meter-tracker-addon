@@ -1,4 +1,8 @@
 from datetime import datetime, timedelta
+try:
+    from zoneinfo import ZoneInfo
+except ImportError:
+    from backports.zoneinfo import ZoneInfo
 from collections import defaultdict
 import json
 
@@ -662,12 +666,16 @@ def build_day_chart_html(day, day_blocks, meter_colors, chart_prefix=''):
 # Main entry point
 # ─────────────────────────────────────────────────────────────
 
-def generate_daily_import_export_charts(blocks):
+def generate_daily_import_export_charts(blocks, timezone_name="UTC"):
 
     if not blocks:
         return "<html><body><p>No data available.</p></body></html>"
 
-    today = datetime.now().date()
+    try:
+        _tz = ZoneInfo(timezone_name)
+    except Exception:
+        _tz = ZoneInfo("UTC")
+    today = datetime.now(tz=_tz).date()
 
     # ── Group blocks by day ──
     days_map = defaultdict(list)
@@ -1814,7 +1822,7 @@ function showView(view) {{
 # Net heatmap (unchanged stub — keep your existing implementation)
 # ─────────────────────────────────────────────────────────────
 
-def generate_net_heatmap(blocks):
+def generate_net_heatmap(blocks, timezone_name="UTC"):
     if not blocks:
         return "<html><body><p>No data available</p></body></html>"
 

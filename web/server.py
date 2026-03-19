@@ -355,10 +355,11 @@ def api_regenerate_charts():
         if not blocks:
             return jsonify({"error": "No blocks data available"}), 400
         os.makedirs(CHART_DIR, exist_ok=True)
-        html = energy_charts.generate_net_heatmap(blocks)
+        tz_name = os.environ.get("ADDON_TIMEZONE", "UTC")
+        html = energy_charts.generate_net_heatmap(blocks, timezone_name=tz_name)
         with open(os.path.join(CHART_DIR, "net_heatmap.html"), "w") as f:
             f.write(html)
-        html = energy_charts.generate_daily_import_export_charts(blocks)
+        html = energy_charts.generate_daily_import_export_charts(blocks, timezone_name=tz_name)
         with open(os.path.join(CHART_DIR, "daily_usage.html"), "w") as f:
             f.write(html)
         logger.info("server: charts regenerated on demand")
