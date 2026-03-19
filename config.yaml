@@ -1,7 +1,7 @@
-name: "Energy Meter Tracker"
+name: "Energy Meter Tracker KShips Dev"
 description: "Half-hourly energy metering engine with sub-meter support, gap filling, and billing charts."
-version: "1.1.0"
-slug: "energy_meter_tracker"
+version: "1.1.1"
+slug: "energy_meter_tracker_dev"
 init: false
 startup: application
 boot: auto
@@ -21,14 +21,14 @@ map:
 # ── Network ───────────────────────────────────────────────────────────────────
 # Port 8099 — direct access (optional, can be disabled)
 ports:
-  8099/tcp: 8099
+  8098/tcp: 8098
 ports_description:
-  8099/tcp: "Web UI (direct access)"
+  8098/tcp: "Web UI (direct access)"
 
 # ── Ingress ───────────────────────────────────────────────────────────────────
 # Enables the "Show in sidebar" toggle and embedded UI in HA
 ingress: true
-ingress_port: 8099
+ingress_port: 8098
 
 # ── HA API access ─────────────────────────────────────────────────────────────
 # Required for WebSocket + REST API calls to HA
