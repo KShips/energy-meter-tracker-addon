@@ -23,7 +23,7 @@
   .chart-tab.active { background: rgba(0,212,170,0.1); color: var(--accent); border-color: var(--accent); }
 
   .chart-frame-wrap {
-    background: white;
+    background: var(--surface);
     border-radius: var(--radius);
     overflow: hidden;
     border: 1px solid var(--border);
@@ -54,7 +54,9 @@
     <h2>Charts</h2>
     <div class="sub">Net energy heatmap and daily import/export</div>
   </div>
-  <button class="btn btn-secondary" onclick="regenerate()">↺ Regenerate Charts</button>
+  <div style="display:flex;gap:8px;align-items:center;">
+    <button class="btn btn-secondary" onclick="regenerate()" id="regen-btn">↺ Regenerate</button>
+  </div>
 </div>
 {% endblock %}
 
